@@ -1,0 +1,96 @@
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// Collection: users
+// Document ID: {uid}
+// Fields:
+//   - uid: string (required) - Unique user ID
+//   - username: string (required) - Unique username
+//   - email: string (required) - User email
+//   - photoURL: string (optional) - Profile picture URL
+//   - createdAt: string (required) - ISO 8601 date-time
+//
+// Collection: memories
+// Document ID: {memoryId}
+// Fields:
+//   - id: string (optional, usually doc ID)
+//   - userId: string (required) - ID of the creator
+//   - date: string (required) - YYYY-MM-DD format
+//   - text: string (required) - Content of the memory
+//   - mediaUrls: list (optional) - List of image/video URLs
+//   - taggedUserIds: list (optional) - List of tagged user IDs
+//   - createdAt: string (required) - ISO 8601 date-time
+//
+// ===============================================================
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.userId;
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidDateString(dateStr) {
+      return dateStr is string && dateStr.matches("^\\d{4}-\\d{2}-\\d{2}$");
+    }
+
+    function isValidDateTimeString(dateTimeStr) {
+      return dateTimeStr is string && dateTimeStr.matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*Z?$");
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "Jayanthmuddulurt2004@gmail.com" && request.auth.token.email_verified == true) ||
+          (request.auth.token.email == "ferrypot23@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'username', 'email', 'createdAt']) &&
+             data.uid is string && data.uid == request.auth.uid &&
+             data.username is string && data.username.size() >= 3 && data.username.size() <= 50 &&
+             data.email is string && isValidEmail(data.email) &&
+             isValidDateTimeString(data.createdAt);
+    }
+
+    function isValidMemory(data) {
+      return data.keys().hasAll(['userId', 'date', 'text', 'createdAt']) &&
+             data.userId is string && data.userId == request.auth.uid &&
+             isValidDateString(data.date) &&
+             data.text is string && data.text.size() > 0 && data.text.size() <= 10000 &&
+             isValidDateTimeString(data.createdAt) &&
+             (!('mediaUrls' in data) || (data.mediaUrls is list && data.mediaUrls.size() <= 20)) &&
+             (!('taggedUserIds' in data) || (data.taggedUserIds is list && data.taggedUserIds.size() <= 50));
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}

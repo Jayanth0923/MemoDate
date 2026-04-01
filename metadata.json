@@ -1,0 +1,8 @@
+{
+  "name": "MemoDate",
+  "description": "A personal memory calendar to store text, images, and videos tied to specific dates, with user tagging and secure storage.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
